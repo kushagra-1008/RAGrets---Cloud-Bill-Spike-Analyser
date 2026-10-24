@@ -111,5 +111,5 @@ def test_reset_command_clears_billing_database_and_history(tmp_path, monkeypatch
     response = ctx.sent[-1][1].text()
     assert "4 billing records" in response
     assert "2 invoices" in response
-    assert "1 evidence items" in response
+    assert "1 evidence item" in response
     assert "You can now upload a new billing file." in response
