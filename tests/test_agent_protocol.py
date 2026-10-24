@@ -163,7 +163,13 @@ def test_pdf_attachment_is_ingested_and_question_is_answered(
         resource_id=uuid4(),
         resource=resource,
     )
-    incoming = message("analyse the bill", attachment)
+    ragrets_agent._histories.clear()
+    ragrets_agent.append_history("alice", "Previous bill question", "Old answer")
+    incoming = message(
+        "analyse the bill",
+        StartSessionContent(type="start-session"),
+        attachment,
+    )
     ctx = FakeContext()
 
     def fake_answerer(question, history):
