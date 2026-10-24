@@ -78,7 +78,7 @@ def get_text(msg: ChatMessage) -> str:
 
 def is_reset_command(question: str) -> bool:
     """Recognize reset commands even when ASI:One prefixes an agent mention."""
-    normalized = re.sub(r"^@\\S+\\s+", "", question.strip(), count=1)
+    normalized = re.sub(r"^@\S+\s+", "", question.strip(), count=1)
     return normalized.strip().casefold() == "reset"
 
 
