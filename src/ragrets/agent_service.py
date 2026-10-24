@@ -1,5 +1,6 @@
 """Billing service used by the Agentverse ACP adapter."""
 
+from .asi1 import ASI1Client
 from .config import Settings
 from .database import Database
 from .groq import GroqClient
@@ -89,7 +90,14 @@ def build_database_context():
 
 def _answer_question(question, history, context_builder):
     settings = Settings()
-    client = GroqClient(settings.groq_api_key, settings.groq_model)
+    if settings.llm_provider == "asi1":
+        client = ASI1Client(settings.groq_api_key, settings.groq_model)
+    elif settings.llm_provider == "groq":
+        client = GroqClient(settings.groq_api_key, settings.groq_model)
+    else:
+        raise ValueError(
+            "Unsupported RAGRETS_LLM_PROVIDER. Choose 'asi1' or 'groq'."
+        )
 
     report, records, invoices = context_builder()
 
