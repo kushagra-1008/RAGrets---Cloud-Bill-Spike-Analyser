@@ -32,9 +32,9 @@ The bundled sample data is fictional and contains September and October 2026 cos
 flowchart LR
     A[ASI:One user] --> B[Agentverse External Integration]
     B --> C[ACP mailbox uAgent]
-    C --> D[Deterministic billing workflow]
-    D --> E[Fresh synthetic billing context]
-    C --> F[Groq explanation]
+    C --> D[Configured SQLite database]
+    D --> E[Deterministic billing workflow]
+    E --> F[Groq explanation]
     F --> C
     C --> B
     B --> A
