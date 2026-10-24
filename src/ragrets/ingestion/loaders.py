@@ -117,7 +117,7 @@ def _parse_synthetic_billing_pdf(text: str) -> tuple[list[dict], list[dict]]:
     Parse the specific synthetic cloud bill created for RAGrets.
 
     This parser expects the source IDs and fields in the detailed usage
-    table, such as oct-001 and nov-001. It deliberately fails closed if
+    table, such as may-001, oct-001, and nov-001. It deliberately fails closed if
     the expected table rows cannot be recognized.
     """
     records = []
@@ -183,7 +183,7 @@ def _parse_synthetic_billing_pdf(text: str) -> tuple[list[dict], list[dict]]:
         r"(-?\$[\d.]+)\s+"
         r"(\$[\d.]+)\s+"
         r"(\$[\d.]+)\s+"
-        r"((?:oct|nov)-\d+)",
+        r"([A-Za-z][A-Za-z0-9_-]*-\d+)",
         re.IGNORECASE,
     )
 
@@ -201,7 +201,7 @@ def _parse_synthetic_billing_pdf(text: str) -> tuple[list[dict], list[dict]]:
         r"(-?\$[\d.]+)\s+"
         r"(\$[\d.]+)\s+"
         r"(\$[\d.]+)\s+"
-        r"((?:oct|nov)-\d+)",
+        r"([A-Za-z][A-Za-z0-9_-]*-\d+)",
         re.IGNORECASE,
     )
 
