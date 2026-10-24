@@ -1,10 +1,15 @@
+import asyncio
 import inspect
+import logging
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+from ragrets.database import Database
+from ragrets.ingestion import demo_data, ingest_records
 from uagents_core.contrib.protocols.chat import (
     ChatMessage,
     EndSessionContent,
@@ -68,3 +73,43 @@ def test_reset_command_accepts_asi_one_agent_mention_prefix():
     assert ragrets_agent.is_reset_command('RESET')
     assert ragrets_agent.is_reset_command('@agent1qt7zrs78qu8q9wqt97t43r9y8ramf24j3gmnf38wg0aftqw3tv75w8nycc8 reset')
     assert not ragrets_agent.is_reset_command('please reset the investigation')
+
+
+class FakeContext:
+    def __init__(self):
+        self.sent = []
+        self.logger = logging.getLogger("test-ragrets-agent")
+
+    async def send(self, recipient, msg):
+        self.sent.append((recipient, msg))
+
+
+def test_reset_command_clears_billing_database_and_history(tmp_path, monkeypatch):
+    database_path = tmp_path / "agent-reset.db"
+    db = Database(database_path)
+    records, invoices = demo_data()
+    ingest_records(db, records, invoices, "test-demo")
+
+    ragrets_agent._histories.clear()
+    ragrets_agent.append_history("alice", "Old question", "Old answer")
+    monkeypatch.setattr(
+        ragrets_agent,
+        "Settings",
+        lambda: SimpleNamespace(database_path=database_path),
+    )
+
+    ctx = FakeContext()
+    reset_message = message(
+        "@agent1qt7zrs78qu8q9wqt97t43r9y8ramf24j3gmnf38wg0aftqw3tv75w8nycc8 reset"
+    )
+    asyncio.run(ragrets_agent.handle_chat_message(ctx, "alice", reset_message))
+
+    assert db.records() == []
+    assert db.invoices() == []
+    assert db.evidence() == []
+    assert "alice" not in ragrets_agent._histories
+    response = ctx.sent[-1][1].text()
+    assert "4 billing records" in response
+    assert "2 invoices" in response
+    assert "1 evidence item" in response
+    assert "You can now upload a new billing file." in response

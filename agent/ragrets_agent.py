@@ -21,6 +21,8 @@ from uagents_core.contrib.protocols.chat import (
 )
 
 from ragrets.agent_service import answer_database_question
+from ragrets.config import Settings
+from ragrets.database import Database
 from ragrets.groq import GroqAPIError
 
 MAX_HISTORY_MESSAGES = 20
@@ -161,11 +163,34 @@ async def handle_chat_message(
     resources = get_resources(msg)
 
     if is_reset_command(question):
+        try:
+            settings = Settings()
+            counts = Database(settings.database_path).clear_billing_data()
+        except Exception:
+            ctx.logger.exception("Failed to reset RAGrets billing data")
+            await ctx.send(
+                sender,
+                create_text_chat(
+                    "Reset failed. Billing data was not cleared. "
+                    "Please check the agent logs and try again."
+                ),
+            )
+            return
+
         _histories.pop(sender, None)
         await ctx.send(
             sender,
             create_text_chat(
-                "Conversation history cleared. Your billing database was not changed."
+                "Reset complete. Cleared "
+                f"{counts['billing_records']} billing record"
+                f"{'' if counts['billing_records'] == 1 else 's'}, "
+                f"{counts['invoices']} invoice"
+                f"{'' if counts['invoices'] == 1 else 's'}, and "
+                f"{counts['evidence']} evidence item"
+                f"{'' if counts['evidence'] == 1 else 's'}. "
+                "Conversation history was cleared. Past reports, ingestion "
+                "logs, approvals, and audit history were retained. "
+                "You can now upload a new billing file."
             ),
         )
         return
