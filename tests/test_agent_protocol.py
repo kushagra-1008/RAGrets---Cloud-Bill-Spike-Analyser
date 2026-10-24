@@ -62,3 +62,9 @@ def test_build_agent_requires_seed_phrase(monkeypatch):
     monkeypatch.delenv('AGENT_SEED_PHRASE', raising=False)
     with pytest.raises(RuntimeError, match='AGENT_SEED_PHRASE'):
         ragrets_agent.build_agent()
+
+def test_reset_command_accepts_asi_one_agent_mention_prefix():
+    assert ragrets_agent.is_reset_command('reset')
+    assert ragrets_agent.is_reset_command('RESET')
+    assert ragrets_agent.is_reset_command('@agent1qt7zrs78qu8q9wqt97t43r9y8ramf24j3gmnf38wg0aftqw3tv75w8nycc8 reset')
+    assert not ragrets_agent.is_reset_command('please reset the investigation')

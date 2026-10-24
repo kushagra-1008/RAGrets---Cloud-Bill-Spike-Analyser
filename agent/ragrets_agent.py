@@ -2,6 +2,7 @@
 """RAGrets billing agent for Agentverse and ASI:One."""
 
 import os
+import re
 from datetime import datetime, timezone
 from typing import Callable
 from urllib.parse import urlparse
@@ -73,6 +74,12 @@ def get_text(msg: ChatMessage) -> str:
         for item in msg.content
         if isinstance(item, TextContent) and item.text.strip()
     ).strip()
+
+
+def is_reset_command(question: str) -> bool:
+    """Recognize reset commands even when ASI:One prefixes an agent mention."""
+    normalized = re.sub(r"^@\S+\s+", "", question.strip(), count=1)
+    return normalized.strip().casefold() == "reset"
 
 
 def describe_resources(resources: list[ResourceContent]) -> str:
@@ -153,7 +160,7 @@ async def handle_chat_message(
     question = get_text(msg)
     resources = get_resources(msg)
 
-    if question.lower() == "reset":
+    if is_reset_command(question):
         _histories.pop(sender, None)
         await ctx.send(
             sender,
