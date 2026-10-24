@@ -7,7 +7,9 @@ There is no Streamlit interface or local web dashboard. The public interface is 
 ## What the agent does
 
 - Accepts ACP chat messages from Agentverse and ASI:One.
-- Creates a fresh synthetic cloud-billing context for each answer.
+- Analyzes billing records stored in the configured SQLite database.
+- Ingests supported PDF attachments sent in ASI:One chat, then can answer the accompanying billing question.
+- Clears active billing records, invoices, and evidence when the user sends `reset`; audit history and prior reports are retained.
 - Detects changes across billing periods by service, region, and resource.
 - Reconciles billing detail with invoices.
 - Uses Groq for evidence-based answers with source record IDs.
@@ -15,7 +17,14 @@ There is no Streamlit interface or local web dashboard. The public interface is 
 - Clears a sender's history on ACP start or end session messages.
 - Does not modify cloud resources or access cloud-provider accounts.
 
-The bundled data is fictional and contains September and October 2026 costs for `demo-acct`. It includes a new Compute resource (`oct-2`) and new Storage cost (`oct-3`) in October.
+The bundled sample data is fictional and contains September and October 2026 costs for `demo-acct`. It includes a new Compute resource (`oct-2`) and new Storage cost (`oct-3`) in October. The live chat handler reads the configured database; sample/demo data is not automatically restored after `reset`.
+
+### PDF attachment support
+
+- Attach one PDF to an ASI:One message. The agent downloads it over HTTPS, validates the PDF bytes, and tries to parse it with the existing RAGrets synthetic-bill layout parser.
+- The current parser supports the specific synthetic cloud-bill format used for testing. It is not a general parser for arbitrary AWS/Azure/GCP invoice layouts, and scanned PDFs without selectable text are not supported.
+- Downloads are limited to 20 MB and, by default, only `res.cloudinary.com` is allowed. If your trusted file provider uses another domain, configure `RAGRETS_ATTACHMENT_ALLOWED_HOSTS` with a comma-separated allowlist. Redirect destinations are validated too.
+- If extraction or schema validation fails, the attachment is rejected rather than silently imported.
 
 ## Architecture
 
@@ -23,9 +32,9 @@ The bundled data is fictional and contains September and October 2026 costs for 
 flowchart LR
     A[ASI:One user] --> B[Agentverse External Integration]
     B --> C[ACP mailbox uAgent]
-    C --> D[Deterministic billing workflow]
-    D --> E[Fresh synthetic billing context]
-    C --> F[Groq explanation]
+    C --> D[Configured SQLite database]
+    D --> E[Deterministic billing workflow]
+    E --> F[Groq explanation]
     F --> C
     C --> B
     B --> A
@@ -111,4 +120,4 @@ python -m pytest -q
 
 ## Privacy and limits
 
-Each answer uses bundled synthetic billing data only. The outgoing Groq request contains the compact deterministic report, temporary relevant history, and any billing data selected by its read-only tools. Do not commit `.env`, seed phrases, Agentverse keys, or Groq keys.
+The agent uses the bill records ingested into its configured SQLite database. The outgoing Groq request contains the deterministic billing report, temporary relevant conversation history, and billing details selected by its read-only tools. `reset` clears the active records, invoices, and evidence, but deliberately retains reports, ingestion logs, approvals, and audit history. Do not commit `.env`, seed phrases, Agentverse keys, or Groq keys.

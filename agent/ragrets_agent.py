@@ -1,11 +1,14 @@
 
 """RAGrets billing agent for Agentverse and ASI:One."""
 
+import asyncio
+import hashlib
 import os
 import re
+import tempfile
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Callable
-from urllib.parse import urlparse
 from uuid import uuid4
 
 from uagents import Agent, Context, Protocol
@@ -21,9 +24,11 @@ from uagents_core.contrib.protocols.chat import (
 )
 
 from ragrets.agent_service import answer_database_question
+from ragrets.attachment_download import download_pdf_bytes
 from ragrets.config import Settings
 from ragrets.database import Database
 from ragrets.groq import GroqAPIError
+from ragrets.ingestion import ingest_file
 
 MAX_HISTORY_MESSAGES = 20
 _histories: dict[str, list[dict[str, str]]] = {}
@@ -84,47 +89,61 @@ def is_reset_command(question: str) -> bool:
     return normalized.strip().casefold() == "reset"
 
 
-def describe_resources(resources: list[ResourceContent]) -> str:
-    """Describe attachments without exposing their complete URIs."""
-    lines: list[str] = []
+def _ingest_pdf_resource(resource) -> dict:
+    """Download, validate, parse, and ingest one Agentverse PDF attachment."""
+    uri = resource.uri or ""
+    metadata = resource.metadata or {}
+    declared_mime = (
+        metadata.get("mime_type")
+        or metadata.get("content_type")
+        or metadata.get("type")
+        or ""
+    )
+    declared_mime = declared_mime.split(";", 1)[0].strip().lower()
+    if declared_mime and declared_mime not in {
+        "application/pdf",
+        "application/x-pdf",
+        "application/octet-stream",
+    }:
+        raise ValueError(
+            f"This workflow accepts PDF attachments, not {declared_mime}."
+        )
 
-    for resource_content in resources:
-        items = resource_content.resource
-        if not isinstance(items, list):
-            items = [items]
+    payload = download_pdf_bytes(uri)
+    digest = hashlib.sha256(payload).hexdigest()
+    source_id = f"agentverse-pdf-{digest[:20]}"
 
-        for resource in items:
-            uri = resource.uri or ""
-            parsed_uri = urlparse(uri)
-            scheme = parsed_uri.scheme or "no-scheme"
-            host = parsed_uri.hostname or "unknown"
-            metadata = resource.metadata or {}
+    settings = Settings()
+    database = Database(settings.database_path)
+    with tempfile.TemporaryDirectory(prefix="ragrets-pdf-") as temp_dir:
+        pdf_path = Path(temp_dir) / "attachment.pdf"
+        pdf_path.write_bytes(payload)
+        result = ingest_file(database, pdf_path, source_id=source_id)
 
-            filename = (
-                metadata.get("filename")
-                or metadata.get("file_name")
-                or metadata.get("name")
-                or "not provided"
-            )
-            mime_type = (
-                metadata.get("mime_type")
-                or metadata.get("content_type")
-                or metadata.get("type")
-                or "not provided"
-            )
+    if result.get("status") != "completed":
+        issues = result.get("issues") or ["The PDF could not be parsed."]
+        raise ValueError("; ".join(str(issue) for issue in issues))
 
-            lines.append(
-                f"- Filename: {filename}\n"
-                f"- MIME type: {mime_type}\n"
-                f"- Metadata keys: "
-                f"{', '.join(sorted(metadata.keys())) or '(none)'}\n"
-                f"- URI scheme: {scheme}\n"
-                f"- URI host: {host}\n"
-                f"- URI present: {'yes' if uri else 'no'}"
-            )
+    result["source_id"] = source_id
+    return result
 
-    return "\n\n".join(lines) or "No resource details found."
 
+async def ingest_pdf_resource(resource) -> dict:
+    """Run network access, PDF parsing, and database writes off the event loop."""
+    return await asyncio.to_thread(_ingest_pdf_resource, resource)
+
+
+def _attachment_summary(result: dict) -> str:
+    records = result.get("records", 0)
+    invoices = result.get("invoices", 0)
+    pages = result.get("pages", 0)
+    return (
+        f"PDF ingested successfully: {records} billing record"
+        f"{'' if records == 1 else 's'}, {invoices} invoice"
+        f"{'' if invoices == 1 else 's'}, {pages} page"
+        f"{'' if pages == 1 else 's'}. "
+        "The extracted records are now in RAGrets' active billing database."
+    )
 
 def append_history(sender: str, question: str, answer: str) -> None:
     history = _histories.setdefault(sender, [])
@@ -145,7 +164,7 @@ async def handle_chat_message(
         [str, list[dict[str, str]]], str
     ] = answer_database_question,
 ) -> None:
-    """Handle chat sessions, attachment diagnostics, and billing questions."""
+    """Handle chat sessions, PDF attachment ingestion, and billing questions."""
     await ctx.send(
         sender,
         ChatAcknowledgement(
@@ -154,13 +173,16 @@ async def handle_chat_message(
         ),
     )
 
+    question = get_text(msg)
+    resources = get_resources(msg)
+
     if is_session_start(msg):
         _histories.pop(sender, None)
         await ctx.send(sender, create_attachment_metadata_chat())
-        return
-
-    question = get_text(msg)
-    resources = get_resources(msg)
+        # ASI:One may combine the start marker with the first question or
+        # attachment. Only return when this is a marker-only message.
+        if not question and not resources:
+            return
 
     if is_reset_command(question):
         try:
@@ -196,13 +218,82 @@ async def handle_chat_message(
         return
 
     if resources:
-        details = describe_resources(resources)
+        resource_items = []
+        for resource_content in resources:
+            items = resource_content.resource
+            if not isinstance(items, list):
+                items = [items]
+            resource_items.extend(items)
+
+        if len(resource_items) != 1:
+            await ctx.send(
+                sender,
+                create_text_chat(
+                    "Please attach one PDF per message for now. "
+                    "No attachment was ingested."
+                ),
+            )
+            return
+
+        try:
+            result = await ingest_pdf_resource(resource_items[0])
+        except (ValueError, RuntimeError, OSError) as exc:
+            await ctx.send(
+                sender,
+                create_text_chat(
+                    "I couldn't ingest this PDF: "
+                    f"{exc} No billing records were imported from this attachment."
+                ),
+            )
+            return
+        except Exception:
+            ctx.logger.exception("Unexpected RAGrets PDF ingestion error")
+            await ctx.send(
+                sender,
+                create_text_chat(
+                    "I couldn't ingest this PDF because of an unexpected "
+                    "internal error. Please check the agent logs."
+                ),
+            )
+            return
+
+        summary = _attachment_summary(result)
+        if not question:
+            await ctx.send(
+                sender,
+                create_text_chat(
+                    summary + " Ask a billing question to analyze the uploaded bill.",
+                    end_session=is_session_end(msg),
+                ),
+            )
+            if is_session_end(msg):
+                _histories.pop(sender, None)
+            return
+
+        history = list(_histories.get(sender, []))
+        try:
+            answer = answerer(question, history)
+        except (GroqAPIError, ValueError) as exc:
+            answer = (
+                "The PDF was ingested, but I couldn't complete the analysis: "
+                f"{exc}"
+            )
+        except Exception:
+            ctx.logger.exception("Unexpected RAGrets billing-agent error after PDF ingestion")
+            answer = (
+                "The PDF was ingested, but I couldn't complete the analysis. "
+                "Please try again later."
+            )
+
+        append_history(sender, question, answer)
+        end_session = is_session_end(msg)
+        if end_session:
+            _histories.pop(sender, None)
         await ctx.send(
             sender,
             create_text_chat(
-                "Attachment diagnostic information:\n\n"
-                f"{details}\n\n"
-                "The file has been detected, but not downloaded or ingested yet."
+                summary + "\n\n" + answer,
+                end_session=end_session,
             ),
         )
         return
