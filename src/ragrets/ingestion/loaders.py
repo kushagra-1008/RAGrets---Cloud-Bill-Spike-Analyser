@@ -201,7 +201,7 @@ def _parse_synthetic_billing_pdf(text: str) -> tuple[list[dict], list[dict]]:
         r"(-?\$[\d.]+)\s+"
         r"(\$[\d.]+)\s+"
         r"(\$[\d.]+)\s+"
-        r"((?:oct|nov)-\d+)",
+        r"([A-Za-z][A-Za-z0-9_-]*-\d+)",
         re.IGNORECASE,
     )
 
