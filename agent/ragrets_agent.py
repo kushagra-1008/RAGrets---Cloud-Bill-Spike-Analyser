@@ -182,9 +182,12 @@ async def handle_chat_message(
             sender,
             create_text_chat(
                 "Reset complete. Cleared "
-                f"{counts['billing_records']} billing records, "
-                f"{counts['invoices']} invoices, and "
-                f"{counts['evidence']} evidence items. "
+                f"{counts['billing_records']} billing record"
+                f"{'' if counts['billing_records'] == 1 else 's'}, "
+                f"{counts['invoices']} invoice"
+                f"{'' if counts['invoices'] == 1 else 's'}, and "
+                f"{counts['evidence']} evidence item"
+                f"{'' if counts['evidence'] == 1 else 's'}. "
                 "Conversation history was cleared. Past reports, ingestion "
                 "logs, approvals, and audit history were retained. "
                 "You can now upload a new billing file."
