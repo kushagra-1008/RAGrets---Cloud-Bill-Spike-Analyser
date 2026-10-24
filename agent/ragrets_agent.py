@@ -9,7 +9,6 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
-from urllib.parse import urlparse
 from uuid import uuid4
 
 from uagents import Agent, Context, Protocol
@@ -90,49 +89,6 @@ def is_reset_command(question: str) -> bool:
     return normalized.strip().casefold() == "reset"
 
 
-def describe_resources(resources: list[ResourceContent]) -> str:
-    """Describe attachments without exposing their complete URIs."""
-    lines: list[str] = []
-
-    for resource_content in resources:
-        items = resource_content.resource
-        if not isinstance(items, list):
-            items = [items]
-
-        for resource in items:
-            uri = resource.uri or ""
-            parsed_uri = urlparse(uri)
-            scheme = parsed_uri.scheme or "no-scheme"
-            host = parsed_uri.hostname or "unknown"
-            metadata = resource.metadata or {}
-
-            filename = (
-                metadata.get("filename")
-                or metadata.get("file_name")
-                or metadata.get("name")
-                or "not provided"
-            )
-            mime_type = (
-                metadata.get("mime_type")
-                or metadata.get("content_type")
-                or metadata.get("type")
-                or "not provided"
-            )
-
-            lines.append(
-                f"- Filename: {filename}\n"
-                f"- MIME type: {mime_type}\n"
-                f"- Metadata keys: "
-                f"{', '.join(sorted(metadata.keys())) or '(none)'}\n"
-                f"- URI scheme: {scheme}\n"
-                f"- URI host: {host}\n"
-                f"- URI present: {'yes' if uri else 'no'}"
-            )
-
-    return "\n\n".join(lines) or "No resource details found."
-
-
-
 def _ingest_pdf_resource(resource) -> dict:
     """Download, validate, parse, and ingest one Agentverse PDF attachment."""
     uri = resource.uri or ""
@@ -208,7 +164,7 @@ async def handle_chat_message(
         [str, list[dict[str, str]]], str
     ] = answer_database_question,
 ) -> None:
-    """Handle chat sessions, attachment diagnostics, and billing questions."""
+    """Handle chat sessions, PDF attachment ingestion, and billing questions."""
     await ctx.send(
         sender,
         ChatAcknowledgement(
@@ -217,13 +173,16 @@ async def handle_chat_message(
         ),
     )
 
+    question = get_text(msg)
+    resources = get_resources(msg)
+
     if is_session_start(msg):
         _histories.pop(sender, None)
         await ctx.send(sender, create_attachment_metadata_chat())
-        return
-
-    question = get_text(msg)
-    resources = get_resources(msg)
+        # ASI:One may combine the start marker with the first question or
+        # attachment. Only return when this is a marker-only message.
+        if not question and not resources:
+            return
 
     if is_reset_command(question):
         try:
