@@ -1,0 +1,26 @@
+[project]
+name = "ragrets"
+version = "0.2.0"
+description = "Agentverse cloud billing investigation agent"
+requires-python = ">=3.11"
+dependencies = [
+  "pandas>=2.2", "numpy>=1.26", "pymupdf>=1.24", "requests>=2.31",
+  "pydantic>=2.7", "langchain>=0.2", "langgraph>=0.2",
+  "uagents>=0.25.5", "uagents-core>=0.4.0"
+]
+
+[project.optional-dependencies]
+dashboard = ["playwright>=1.45"]
+dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "--basetemp=.pytest_tmp"
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

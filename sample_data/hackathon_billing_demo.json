@@ -1,0 +1,84 @@
+{
+  "records": [
+    {
+      "account": "demo-acct",
+      "billing_period": "2026-09",
+      "service": "Compute",
+      "region": "us-east-1",
+      "resource_id": "i-0a1b2c3d4e5f67890",
+      "usage_quantity": 100,
+      "usage_unit": "hours",
+      "unit_price": 1.0,
+      "usage_cost": 100.0,
+      "credits": -10.0,
+      "adjustments": 0.0,
+      "net_cost": 90.0,
+      "source_record_id": "DEMO-202609-COMPUTE-001"
+    },
+    {
+      "account": "demo-acct",
+      "billing_period": "2026-10",
+      "service": "Compute",
+      "region": "us-east-1",
+      "resource_id": "i-0a1b2c3d4e5f67890",
+      "usage_quantity": 100,
+      "usage_unit": "hours",
+      "unit_price": 1.0,
+      "usage_cost": 100.0,
+      "credits": -10.0,
+      "adjustments": 0.0,
+      "net_cost": 90.0,
+      "source_record_id": "DEMO-202610-COMPUTE-001"
+    },
+    {
+      "account": "demo-acct",
+      "billing_period": "2026-10",
+      "service": "Compute",
+      "region": "ap-south-1",
+      "resource_id": "i-0f9e8d7c6b5a43210",
+      "usage_quantity": 80,
+      "usage_unit": "hours",
+      "unit_price": 1.5,
+      "usage_cost": 120.0,
+      "credits": 0.0,
+      "adjustments": 0.0,
+      "net_cost": 120.0,
+      "source_record_id": "DEMO-202610-COMPUTE-AP-001"
+    },
+    {
+      "account": "demo-acct",
+      "billing_period": "2026-10",
+      "service": "Storage",
+      "region": "eu-west-1",
+      "resource_id": "rgrts-demo-log-archive-2026",
+      "usage_quantity": 1000,
+      "usage_unit": "GB-month",
+      "unit_price": 0.05,
+      "usage_cost": 50.0,
+      "credits": 0.0,
+      "adjustments": 0.0,
+      "net_cost": 50.0,
+      "source_record_id": "DEMO-202610-STORAGE-EU-001"
+    }
+  ],
+  "invoices": [
+    {
+      "account": "demo-acct",
+      "billing_period": "2026-09",
+      "usage_subtotal": 100.0,
+      "credits": -10.0,
+      "adjustments": 0.0,
+      "tax": 9.0,
+      "invoice_total": 99.0
+    },
+    {
+      "account": "demo-acct",
+      "billing_period": "2026-10",
+      "usage_subtotal": 270.0,
+      "credits": -10.0,
+      "adjustments": 0.0,
+      "tax": 26.0,
+      "invoice_total": 286.0
+    }
+  ]
+}

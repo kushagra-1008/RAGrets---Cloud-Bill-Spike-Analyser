@@ -1,0 +1,35 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.db
+.env
+reports/*
+!reports/.gitkeep
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python environment and caches
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.pytest_tmp/
+.mypy_cache/
+.ruff_cache/
+
+# Local databases and logs
+*.sqlite
+*.sqlite3
+*.db
+*.log
+
+# Build artifacts
+dist/
+build/
+
+# Generated package metadata and editor backups
+*.egg-info/
+*.bak
